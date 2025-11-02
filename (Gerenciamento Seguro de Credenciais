@@ -1,0 +1,62 @@
+# utils.py (Gerenciamento Seguro de Credenciais)
+
+#Este arquivo conterá funções utilitárias, incluindo uma para acessar segredos do Azure Key Vault, demonstrando como suas credenciais reais seriam obtidas sem hardcoding.
+
+# fraud_detection_project/utils.py
+import os
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+
+def get_secret_from_keyvault(secret_name: str) -> str:
+    """
+    Obtém um segredo do Azure Key Vault usando Managed Identity ou credenciais locais.
+    Assume que KEY_VAULT_URL está configurado como variável de ambiente.
+
+    Args:
+        secret_name (str): O nome do segredo a ser recuperado.
+
+    Returns:
+        str: O valor do segredo.
+
+    Raises:
+        ValueError: Se KEY_VAULT_URL não estiver configurado.
+        Exception: Se houver qualquer erro ao obter o segredo.
+    """
+    key_vault_url = os.getenv("AZURE_KEY_VAULT_URL")
+    if not key_vault_url:
+        raise ValueError("A variável de ambiente AZURE_KEY_VAULT_URL não está configurada.")
+
+    try:
+        # DefaultAzureCredential tenta várias formas de autenticação:
+        # - Variáveis de ambiente (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+        # - Identidade Gerenciada (quando rodando em serviços Azure como VM, Functions, AKS)
+        # - Login interativo (local)
+        credential = DefaultAzureCredential()
+        secret_client = SecretClient(vault_url=key_vault_url, credential=credential)
+        secret_value = secret_client.get_secret(secret_name).value
+        print(f" Segredo '{secret_name}' obtido com sucesso do Azure Key Vault.")
+        return secret_value
+    except Exception as e:
+        print(f" Erro ao obter segredo '{secret_name}' do Azure Key Vault: {e}")
+        # Em um cenário real, você pode querer registrar este erro ou levantar uma exceção mais específica.
+        return None
+
+# Exemplo de uso (comente ou remova em produção)
+if __name__ == "__main__":
+    # Para testar localmente, você pode precisar fazer "az login"
+    # ou configurar as variáveis de ambiente AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID.
+    # E configurar AZURE_KEY_VAULT_URL para o URL do seu Key Vault.
+    # Ex: export AZURE_KEY_VAULT_URL="https://meukeyvault.vault.azure.net/"
+    # Ex: export AZURE_CLIENT_ID="<app-id>"
+    # Ex: export AZURE_CLIENT_SECRET="<password>"
+    # Ex: export AZURE_TENANT_ID="<tenant-id>"
+
+    # Ou simplesmente, para uma demonstração conceitual, simule a variável
+    # import os
+    # os.environ["AZURE_KEY_VAULT_URL"] = "https://my-conceptual-keyvault.vault.azure.net/" # Apenas para o exemplo
+    # dummy_secret = get_secret_from_keyvault("minha-chave-de-api-de-pagamento")
+    # if dummy_secret:
+    #     print(f"Valor do segredo (apenas os primeiros caracteres para segurança): {dummy_secret[:5]}...")
+    # else:
+    #     print("Não foi possível obter o segredo conceitual.")
+    pass # Para evitar erro se o bloco if __name__ == "__main__" estiver vazio
