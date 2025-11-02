@@ -1,0 +1,94 @@
+#5. model_trainer
+
+# Este script treinará um modelo de Machine Learning e o salvará.
+
+# fraud_detection_project/model_trainer.py
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, roc_auc_score, precision_recall_curve, auc
+import joblib
+import os
+
+def train_and_evaluate_model(df: pd.DataFrame, model_path: str = "fraud_detection_model.pkl"):
+    """
+    Treina e avalia um modelo de Machine Learning para detecção de fraude.
+
+    Args:
+        df (pd.DataFrame): DataFrame com features e a coluna 'is_fraud'.
+        model_path (str): Caminho para salvar o modelo treinado.
+    """
+    print("Iniciando treinamento e avaliação do modelo...")
+
+    # Separar features (X) e target (y)
+    X = df.drop(columns=['is_fraud'])
+    y = df['is_fraud']
+
+    # Dividir os dados em conjuntos de treinamento e teste
+    # Usamos stratify=y para garantir que a proporção de fraudes seja mantida nos conjuntos
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+    print(f"Dados de treino: {X_train.shape[0]} amostras, Teste: {X_test.shape[0]} amostras")
+    print(f"Fraudes no treino: {y_train.sum()} ({y_train.mean()*100:.2f}%)")
+    print(f"Fraudes no teste: {y_test.sum()} ({y_test.mean()*100:.2f}%)")
+
+    # Inicializar e treinar o modelo (RandomForestClassifier é uma boa escolha para detecção de fraude)
+    model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced') # 'balanced' ajuda com classes desbalanceadas
+    print("Treinando RandomForestClassifier...")
+    model.fit(X_train, y_train)
+    print(" Modelo treinado.")
+
+    # Avaliar o modelo
+    print("\nAvaliação do Modelo:")
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1] # Probabilidade da classe positiva (fraude)
+
+    print("\nRelatório de Classificação:")
+    print(classification_report(y_test, y_pred))
+
+    roc_auc = roc_auc_score(y_test, y_proba)
+    print(f"ROC AUC Score: {roc_auc:.4f}")
+
+    # Precision-Recall AUC é muitas vezes mais informativo para classes desbalanceadas
+    precision, recall, _ = precision_recall_curve(y_test, y_proba)
+    pr_auc = auc(recall, precision)
+    print(f"Precision-Recall AUC: {pr_auc:.4f}")
+    
+    # Salvar o modelo treinado
+    joblib.dump(model, model_path)
+    print(f" Modelo salvo em '{model_path}'.")
+    
+    # Conceito de registrar o modelo no Azure Machine Learning
+    # from azure.ai.ml import MLClient
+    # from azure.identity import DefaultAzureCredential
+    # ml_client = MLClient(DefaultAzureCredential(), subscription_id="...", resource_group_name="...", workspace_name="...")
+    # registered_model = ml_client.models.create_or_update(
+    #     name="fraud-detection-model",
+    #     version="1",
+    #     path=model_path,
+    #     type="mlflow_model" # ou "custom_model" dependendo do formato
+    # )
+    # print(f" Modelo registrado no Azure ML com ID: {registered_model.id}")
+
+
+if __name__ == "__main__":
+    from data_generator import generate_synthetic_data
+    from feature_engineering import create_features
+
+    # Gerar e processar dados
+    raw_df = generate_synthetic_data(num_transactions=5000, fraud_ratio=0.02)
+    
+    # Precisamos garantir que as colunas categóricas no conjunto de treino e teste sejam as mesmas
+    # No entanto, a função create_features faz get_dummies que pode gerar diferentes colunas
+    # dependendo dos valores presentes.
+    # Para um treinamento real, é vital ter um pipeline de preprocessamento que garanta colunas consistentes.
+    # Por simplicidade neste exemplo fundacional, vamos aplicar create_features e então dividir.
+    # Para produção, você usaria um pipeline scikit-learn com ColumnTransformer.
+    
+    features_df = create_features(raw_df)
+    
+    # Garante que as colunas sejam consistentes para o modelo
+    # Se uma feature categórica não aparecer no conjunto de teste, ela terá 0.
+    
+    # Treinar e avaliar
+    train_and_evaluate_model(features_df)
