@@ -1,0 +1,92 @@
+#3. data_generator.py (Geração de Dados Sintéticos)
+
+#Este script gerará um conjunto de dados simulado para trabalharmos.
+
+# fraud_detection_project/data_generator.py
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import random
+
+def generate_synthetic_data(num_transactions: int = 10000, fraud_ratio: float = 0.01) -> pd.DataFrame:
+    """
+    Gera dados sintéticos de transações de cartão de crédito.
+
+    Args:
+        num_transactions (int): Número total de transações a serem geradas.
+        fraud_ratio (float): Proporção de transações fraudulentas (ex: 0.01 para 1%).
+
+    Returns:
+        pd.DataFrame: DataFrame contendo os dados de transações sintéticas.
+    """
+    print(f" Gerando {num_transactions} transações sintéticas...")
+
+    # IDs de Transação
+    transaction_ids = [f'TXN{i:07d}' for i in range(num_transactions)]
+
+    # Usuários (clientes) e Comerciantes (merchants)
+    num_users = int(num_transactions / 10)
+    num_merchants = int(num_transactions / 20)
+    user_ids = [f'USER{i:04d}' for i in range(num_users)]
+    merchant_ids = [f'MERCH{i:03d}' for i in range(num_merchants)]
+
+    # Datas e Horas (últimos 30 dias)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    timestamps = [start_date + (end_date - start_date) * random.random() for _ in range(num_transactions)]
+
+    # Montantes das Transações (distribuição log-normal para simular valores reais)
+    amounts = np.exp(np.random.normal(loc=4, scale=1, size=num_transactions)) # Valores em R\$
+
+    # Tipos de Cartão
+    card_types = random.choices(['Visa', 'Mastercard', 'Amex', 'Elo'], k=num_transactions, weights=[0.4, 0.4, 0.1, 0.1])
+
+    # Países de Origem/Destino (simulação simples)
+    countries = random.choices(['BR', 'US', 'AR', 'PT', 'ES'], k=num_transactions, weights=[0.6, 0.2, 0.1, 0.05, 0.05])
+
+    # Construir DataFrame
+    data = pd.DataFrame({
+        'transaction_id': transaction_ids,
+        'user_id': random.choices(user_ids, k=num_transactions),
+        'merchant_id': random.choices(merchant_ids, k=num_transactions),
+        'timestamp': timestamps,
+        'amount': amounts,
+        'card_type': card_types,
+        'country': countries,
+        'is_fraud': 0 # Inicialmente, todas não são fraude
+    })
+
+    # Simular Fraudes (cerca de fraud_ratio)
+    num_fraud = int(num_transactions * fraud_ratio)
+    fraud_indices = random.sample(range(num_transactions), num_fraud)
+    data.loc[fraud_indices, 'is_fraud'] = 1
+
+    # Introduzir padrões de fraude (ex: transações de alto valor para fraudes)
+    data.loc[data['is_fraud'] == 1, 'amount'] = np.exp(np.random.normal(loc=6, scale=1.5, size=num_fraud)) # Valores mais altos
+    
+    # Fraudes podem ter um país de origem diferente do usuário habitual
+    for idx in fraud_indices:
+        original_country = data.loc[idx, 'country']
+        new_country = random.choice([c for c in countries if c != original_country])
+        data.loc[idx, 'country'] = new_country
+
+    print(f" Dados sintéticos gerados. Fraudes: {data['is_fraud'].sum()} ({data['is_fraud'].mean()*100:.2f}%)")
+    return data
+
+if __name__ == "__main__":
+    df = generate_synthetic_data()
+    print("\nPrimeiras 5 linhas dos dados sintéticos:")
+    print(df.head())
+    print(f"\nExemplo de transações fraudulentas (primeiras 5):")
+    print(df[df['is_fraud'] == 1].head())
+    
+    # Conceito de salvar em Azure Data Lake / Blob Storage
+    # from azure.storage.blob import BlobServiceClient
+    # blob_service_client = BlobServiceClient(account_url="...", credential=DefaultAzureCredential())
+    # blob_client = blob_service_client.get_blob_client(container="raw-data", blob="transactions.csv")
+    # with open("transactions.csv", "rb") as data_stream:
+    #    blob_client.upload_blob(data_stream, overwrite=True)
+    
+    # Salvando localmente para o exemplo
+    df.to_csv("synthetic_transactions.csv", index=False)
+    print("\nDados sintéticos salvos localmente como 'synthetic_transactions.csv'.")
