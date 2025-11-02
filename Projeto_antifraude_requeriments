@@ -1,0 +1,10 @@
+1. requirements.txt
+
+Primeiro, crie este arquivo para listar as bibliotecas Python necessárias.
+
+pandas
+numpy
+scikit-learn
+joblib
+azure-identity
+azure-keyvault-secrets
