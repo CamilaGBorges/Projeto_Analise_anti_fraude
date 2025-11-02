@@ -1,0 +1,197 @@
+#6. fraud_detector.py (Detecção de Fraude)
+
+#Este script simulará a detecção de fraude usando o modelo treinado.
+
+# fraud_detection_project/fraud_detector.py
+import pandas as pd
+import joblib
+import os
+import numpy as np
+
+# A função create_features precisaria ser consistente.
+# Para um ambiente de produção, você salvaria o *pipeline* completo
+# de feature engineering, não apenas o modelo.
+from feature_engineering import create_features # Importa a mesma lógica de feature engineering
+
+class FraudDetector:
+    def __init__(self, model_path: str = "fraud_detection_model.pkl"):
+        """
+        Inicializa o detector de fraude carregando o modelo treinado.
+
+        Args:
+            model_path (str): Caminho para o modelo treinado.
+        """
+        print(f"Loading fraud detection model from '{model_path}'...")
+        try:
+            self.model = joblib.load(model_path)
+            print(" Modelo de detecção de fraude carregado com sucesso.")
+            # Em um cenário real, você também carregaria o pré-processador/pipeline
+            # self.preprocessor = joblib.load("preprocessor_pipeline.pkl")
+            # self.trained_columns = joblib.load("trained_columns.pkl")
+        except FileNotFoundError:
+            print(f" ERRO: Modelo não encontrado em '{model_path}'. Treine o modelo primeiro.")
+            self.model = None
+        except Exception as e:
+            print(f" ERRO ao carregar o modelo: {e}")
+            self.model = None
+
+        # Para um ambiente de produção, estas colunas deveriam ser salvas durante o treino
+        # e carregadas aqui para garantir consistência.
+        # Por simplicidade do exemplo fundacional, estamos apenas definindo-as.
+        self.expected_features_columns = None # Será populado quando o modelo for usado pela primeira vez ou de um arquivo
+
+    def _prepare_data_for_prediction(self, raw_transaction_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepara dados de transação bruta para predição, aplicando a mesma engenharia de features.
+
+        Args:
+            raw_transaction_df (pd.DataFrame): DataFrame com uma ou mais transações brutas.
+
+        Returns:
+            pd.DataFrame: DataFrame com features preparadas para o modelo.
+        """
+        if self.model is None:
+            return None
+        
+        # Aplicar a mesma lógica de engenharia de features
+        # Importante: para features como 'transaction_count_24h' e 'avg_amount_user_history',
+        # você precisaria de dados históricos para o usuário. Para uma única transação,
+        # isso é um desafio. Em produção, esses dados históricos seriam acessados
+        # de um banco de dados de recursos ou cache.
+        
+        # Para este exemplo fundacional, vamos aplicar create_features.
+        # Para features como roll-up (janelas), ela precisaria de mais dados.
+        # Vamos simular que apenas a transação atual está sendo processada.
+        
+        # IMPORTANTE: A função create_features espera um DF grande para calcular médias, etc.
+        # Para prever uma única transação, a feature engineering precisaria ser adaptada
+        # para usar dados históricos do usuário que não estão no DF atual.
+        # Para este exemplo, vamos simplificar e aplicar a função como está,
+        # mas lembre-se que isso é uma simplificação para o contexto de uma única transação.
+        
+        processed_df = create_features(raw_transaction_df.copy())
+
+        # Remover a coluna 'is_fraud' se presente, pois não é uma feature para predição
+        processed_df = processed_df.drop(columns=['is_fraud'], errors='ignore')
+        
+        # Garantir que as colunas sejam consistentes com as usadas no treinamento
+        # Isso é CRÍTICO para a implantação de modelos
+        if self.expected_features_columns is None:
+            # Em um cenário real, estas colunas seriam carregadas de um arquivo
+            # junto com o modelo, para garantir consistência.
+            # Estamos inferindo do modelo, que já tem a ordem das features.
+            try:
+                self.expected_features_columns = list(self.model.feature_names_in_)
+            except AttributeError:
+                # Fallback para modelos que não expõem feature_names_in_ diretamente
+                print(" Não foi possível obter feature_names_in_ do modelo. A consistência das colunas é crucial.")
+                # Em um cenário real, você pararia aqui ou teria um fallback robusto.
+                # Para o exemplo, vamos assumir que as colunas geradas são as mesmas.
+                self.expected_features_columns = processed_df.columns.tolist() # Risco aqui!
+
+        # Adicionar colunas ausentes com 0 e reordenar
+        missing_cols = set(self.expected_features_columns) - set(processed_df.columns)
+        for c in missing_cols:
+            processed_df[c] = 0
+        
+        # Garantir que todas as colunas estão na ordem correta e remover extras
+        processed_df = processed_df[self.expected_features_columns]
+        
+        return processed_df
+
+    def predict_fraud(self, raw_transaction_data: dict) -> tuple[float, bool]:
+        """
+        Prevê se uma transação é fraudulenta e retorna a probabilidade e a decisão.
+
+        Args:
+            raw_transaction_data (dict): Dicionário contendo os dados brutos de uma transação.
+                                         (Ex: {'user_id': 'USER001', 'amount': 150.0, ...})
+
+        Returns:
+            tuple[float, bool]: Uma tupla contendo a probabilidade de fraude e a decisão binária (True/False).
+        """
+        if self.model is None:
+            return 0.0, False
+
+        # Converte o dicionário em DataFrame (simulando uma nova transação)
+        raw_df = pd.DataFrame([raw_transaction_data])
+        
+        # Prepara os dados para predição
+        processed_df = self._prepare_data_for_prediction(raw_df)
+        
+        if processed_df is None:
+            return 0.0, False
+
+        # Realiza a predição
+        fraud_proba = self.model.predict_proba(processed_df)[:, 1][0]
+        # Define um limiar (threshold) para classificar como fraude.
+        # Este threshold deve ser otimizado em produção.
+        FRAUD_THRESHOLD = 0.5
+        is_fraud = fraud_proba >= FRAUD_THRESHOLD
+
+        return fraud_proba, is_fraud
+
+# Exemplo de uso
+if __name__ == "__main__":
+    from data_generator import generate_synthetic_data
+    from feature_engineering import create_features
+    from model_trainer import train_and_evaluate_model
+
+    # 1. Gerar e processar dados para simular o processo de treinamento
+    print("--- Simulação de Treinamento do Modelo ---")
+    raw_df_train = generate_synthetic_data(num_transactions=2000, fraud_ratio=0.02)
+    features_df_train = create_features(raw_df_train)
+    # Treinar e salvar o modelo (necessário para que o detector possa carregá-lo)
+    model_file_path = "fraud_detection_model_temp.pkl"
+    train_and_evaluate_model(features_df_train, model_path=model_file_path)
+    print("\n--- Fim da Simulação de Treinamento ---\n")
+
+    # 2. Inicializar o Detector de Fraude
+    detector = FraudDetector(model_path=model_file_path)
+
+    if detector.model:
+        # Simular uma nova transação para detecção
+        print("--- Simulação de Detecção de Nova Transação ---")
+        
+        # Exemplo 1: Transação aparentemente normal
+        new_transaction_normal = {
+            'user_id': 'USER001',
+            'merchant_id': 'MERCH005',
+            'timestamp': datetime.now(),
+            'amount': 55.75,
+            'card_type': 'Visa',
+            'country': 'BR',
+            'is_fraud': 0 # Isto não seria conhecido em tempo real
+        }
+        proba_normal, is_fraud_normal = detector.predict_fraud(new_transaction_normal)
+        print(f"\nTransação Normal (ID: {new_transaction_normal['user_id']}):")
+        print(f"Probabilidade de fraude: {proba_normal:.4f}")
+        print(f"É fraude? {'SIM' if is_fraud_normal else 'NÃO'}")
+
+        # Exemplo 2: Transação potencialmente fraudulenta (alto valor, país diferente)
+        new_transaction_fraudulent = {
+            'user_id': 'USER001', # Mesmo usuário, mas valor e país suspeitos
+            'merchant_id': 'MERCH099',
+            'timestamp': datetime.now() + timedelta(minutes=5), # Pouco tempo depois
+            'amount': 1500.00, # Alto valor
+            'card_type': 'Mastercard',
+            'country': 'US', # País diferente do habitual
+            'is_fraud': 1 # Isto não seria conhecido em tempo real
+        }
+        proba_fraud, is_fraud_fraud = detector.predict_fraud(new_transaction_fraudulent)
+        print(f"\nTransação Potencialmente Fraudulenta (ID: {new_transaction_fraudulent['user_id']}):")
+        print(f"Probabilidade de fraude: {proba_fraud:.4f}")
+        print(f"É fraude? {'SIM' if is_fraud_fraud else 'NÃO'}")
+        
+        # Limpar o modelo temporário
+        os.remove(model_file_path)
+        print(f"\nModelo temporário '{model_file_path}' removido.")
+    else:
+        print("Não foi possível testar a detecção de fraude, o modelo não foi carregado.")
+
+    # Conceito de implantação da função predict_fraud em Azure Functions ou Azure ML Endpoint
+    # @app.route("/predict", methods=["POST"])
+    # def predict():
+    #    data = request.json
+    #    proba, is_fraud = detector.predict_fraud(data)
+    #    return jsonify({"fraud_probability": proba, "is_fraud": is_fraud})
