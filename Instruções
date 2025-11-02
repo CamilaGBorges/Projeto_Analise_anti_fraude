@@ -1,0 +1,48 @@
+Como Rodar o Projeto Fundacional:
+
+    Crie a Estrutura de Pastas: Crie uma pasta fraud_detection_project e dentro dela, os arquivos main.py, data_generator.py, feature_engineering.py, model_trainer.py, fraud_detector.py, utils.py, e requirements.txt.
+    Preencha os Arquivos: Copie o conteúdo de cada bloco de código para o arquivo correspondente.
+    Instale as Dependências: Abra seu terminal na pasta fraud_detection_project e execute:
+
+    bash
+
+pip install -r requirements.txt
+
+Configure as Variáveis de Ambiente (para Key Vault e Azure Creds):
+
+    AZURE_KEY_VAULT_URL: Essencial para a função get_secret_from_keyvault. Ex: https://meu-vault.vault.azure.net/
+    Para o DefaultAzureCredential funcionar localmente, você pode precisar fazer az login via CLI do Azure, ou definir AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID (para Service Principal).
+    Para Linux/macOS:
+
+    bash
+
+export AZURE_KEY_VAULT_URL="https://seukeyvault.vault.azure.net/"
+# Opcional, se precisar de Service Principal localmente
+# export AZURE_CLIENT_ID="<app-id>"
+# export AZURE_CLIENT_SECRET="<password>"
+# export AZURE_TENANT_ID="<tenant-id>"
+
+Para Windows (PowerShell):
+
+powershell
+
+    $env:AZURE_KEY_VAULT_URL="https://seukeyvault.vault.azure.net/"
+    # Opcional, se precisar de Service Principal localmente
+    # $env:AZURE_CLIENT_ID="<app-id>"
+    # $env:AZURE_CLIENT_SECRET="<password>"
+    # $env:AZURE_TENANT_ID="<tenant-id>"
+
+Execute o Pipeline:
+
+bash
+
+    python main.py
+
+O que este código demonstra:
+
+    Modularidade: O projeto é dividido em responsabilidades claras.
+    Geração de Dados: Uma forma simples de criar dados de transação para desenvolvimento e teste.
+    Engenharia de Features: Exemplos básicos de como transformar dados brutos em features úteis.
+    Treinamento de Modelo: Uso de scikit-learn para treinar um classificador e joblib para salvá-lo.
+    Detecção de Fraude: Como carregar o modelo e usá-lo para prever fraudes em novas transações.
+    Segurança de Credenciais: A função get_secret_from_keyvault em utils.py é um exemplo fundamental de como você não hardcode suas chaves e segredos, mas os obtém com segurança do Azure Key Vault, aproveitando as identidades gerenciadas do Azure.
