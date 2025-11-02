@@ -12,6 +12,20 @@ Objetivos e Requisitos (Reiteração e Adaptação Azure)
     Experiência com sistemas de detecção de fraude: Direcionará a escolha de features, algoritmos e métricas de avaliação.
     Conhecimento das melhores práticas de segurança: Implementação com Azure Key Vault para gerenciamento de segredos, Azure AD para identidade e acesso, e aderência às políticas de segurança do Azure.
 
+Código Fundacional para Detecção de Fraudes em Transações de Cartão (Python + Azure Concepts)
+Estrutura do Projeto Recomendada:
+
+Para manter o código modular e organizado, vamos estruturá-lo em vários arquivos Python.
+
+fraud_detection_project/
+├── main.py                    # Orquestrador principal
+├── data_generator.py          # Gera dados sintéticos de transações
+├── feature_engineering.py     # Lógica para engenharia de features
+├── model_trainer.py           # Treina e avalia o modelo de ML
+├── fraud_detector.py          # Lógica para detecção de fraude usando o modelo treinado
+├── utils.py                   # Funções utilitárias (ex: acesso seguro a Key Vault)
+└── requirements.txt           # Dependências do projeto
+
 2. Análise de Requisitos (Contexto Azure)
 
     Identificação das necessidades do usuário: A plataforma Azure oferece flexibilidade para adaptar a solução a diferentes volumes de transações e requisitos de latência (detecção em tempo real vs. batch).
