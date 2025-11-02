@@ -1,0 +1,99 @@
+#7. main.py (Orquestrador Principal)
+
+#Este é o script que você executaria para iniciar o pipeline.
+
+# fraud_detection_project/main.py
+import os
+from data_generator import generate_synthetic_data
+from feature_engineering import create_features
+from model_trainer import train_and_evaluate_model
+from fraud_detector import FraudDetector
+from utils import get_secret_from_keyvault # Para demonstração de acesso seguro
+
+def run_fraud_detection_pipeline():
+    """
+    Executa o pipeline completo de detecção de fraude:
+    Geração de dados -> Engenharia de Features -> Treinamento do Modelo -> Simulação de Detecção.
+    """
+    print("--- 🚀 Iniciando Pipeline de Detecção de Fraudes 🚀 ---")
+
+    # --- 1. Geração de Dados Sintéticos ---
+    # Em um ambiente real, esta etapa seria a ingestão de dados de um Azure Event Hubs,
+    # Azure Data Factory, ou lendo do Azure Data Lake Storage.
+    print("\n--- Etapa 1: Geração de Dados ---")
+    raw_transactions_df = generate_synthetic_data(num_transactions=10000, fraud_ratio=0.015)
+    
+    # Conceito: Salvar dados brutos em Azure Data Lake Storage
+    # raw_transactions_df.to_parquet("abfss://raw-data@<sua_conta>.dfs.core.windows.net/transactions.parquet")
+
+    # --- 2. Engenharia de Features ---
+    # Esta etapa ocorreria em Azure Databricks ou Azure Synapse Spark Pools para grandes volumes.
+    print("\n--- Etapa 2: Engenharia de Features ---")
+    features_df = create_features(raw_transactions_df)
+    
+    # Conceito: Salvar features processadas em Azure Data Lake Storage
+    # features_df.to_parquet("abfss://processed-data@<sua_conta>.dfs.core.windows.net/features.parquet")
+
+
+    # --- 3. Treinamento e Avaliação do Modelo ---
+    # Esta etapa seria gerenciada pelo Azure Machine Learning.
+    print("\n--- Etapa 3: Treinamento do Modelo ---")
+    model_file_path = "fraud_detection_model.pkl" # Nome do arquivo para o modelo salvo
+    train_and_evaluate_model(features_df, model_path=model_file_path)
+
+    # Conceito: Registrar o modelo no Azure ML Model Registry
+    # O `model_trainer.py` já contém um exemplo comentado.
+
+    # --- 4. Simulação de Detecção de Fraude (Inferência) ---
+    # Em produção, a inferência seria via Azure Functions, Azure ML Endpoint ou Azure Kubernetes Service (AKS).
+    print("\n--- Etapa 4: Simulação de Detecção ---")
+    detector = FraudDetector(model_path=model_file_path)
+
+    if detector.model:
+        # Exemplo de transação em tempo real (dicionário representando uma nova transação)
+        new_transaction_data = {
+            'user_id': 'USER999',
+            'merchant_id': 'MERCH123',
+            'timestamp': pd.to_datetime('2024-01-01 15:30:00'), # Exemplo de timestamp
+            'amount': 2500.00, # Valor relativamente alto
+            'card_type': 'Amex',
+            'country': 'AR', # País diferente do habitual para o usuário
+            # 'is_fraud': 0 # Não fornecido em produção
+        }
+        
+        proba, is_fraud = detector.predict_fraud(new_transaction_data)
+
+        print(f"\n--- Resultado da Detecção para Transação de {new_transaction_data['amount']:.2f} do usuário {new_transaction_data['user_id']} ---")
+        print(f"Probabilidade de fraude: {proba:.4f}")
+        print(f"Decisão: {'FRAUDE DETECTADA!' if is_fraud else 'TRANSAÇÃO NORMAL.'}")
+        print("---------------------------------------------------------------------------------\n")
+    else:
+        print(" Não foi possível realizar a simulação de detecção, o modelo não foi carregado.")
+
+    # --- 5. Demonstração de Acesso Seguro a Segredos (Conceitual) ---
+    # Em um ambiente Azure, o Identity do serviço (Managed Identity) faria a autenticação automática.
+    print("\n--- Demonstração de Acesso Seguro a Segredos (Conceitual) ---")
+    try:
+        # Lembre-se: 'minha-chave-de-api-de-pagamento' é um placeholder.
+        # Você deve criar um segredo real no seu Azure Key Vault com o nome que quiser.
+        # E definir a variável de ambiente AZURE_KEY_VAULT_URL.
+        db_connection_string = get_secret_from_keyvault("DB-CONNECTION-STRING")
+        if db_connection_string:
+            print(f"String de conexão ao DB (parcial): {db_connection_string[:15]}...")
+        else:
+            print("Não foi possível obter a string de conexão do DB. Verifique a configuração do Key Vault e permissões.")
+    except ValueError as e:
+        print(f"Configuração do Key Vault incompleta para demonstração: {e}")
+    except Exception as e:
+        print(f"Ocorreu um erro ao tentar acessar o Key Vault: {e}")
+
+
+    print("\n---  Pipeline de Detecção de Fraudes Concluído  ---")
+
+if __name__ == "__main__":
+    # Certifique-se de configurar as variáveis de ambiente necessárias
+    # Ex: export AZURE_KEY_VAULT_URL="https://seu-key-vault-name.vault.azure.net/"
+    # Lembre-se que para rodar localmente com DefaultAzureCredential, você pode precisar
+    # de "az login" ou configurar as variáveis AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID.
+
+    run_fraud_detection_pipeline()
