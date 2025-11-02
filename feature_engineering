@@ -1,6 +1,6 @@
 4. feature_engineering.py (Engenharia de Features)
 
-Aqui, criamos características que podem ajudar o modelo a identificar fraudes.
+Aqui, criamos características que podem ajudar o modelo a identificar fraudes .
 
 # fraud_detection_project/feature_engineering.py
 import pandas as pd
