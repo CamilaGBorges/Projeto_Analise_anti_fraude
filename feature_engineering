@@ -1,3 +1,60 @@
 4. feature_engineering.py (Engenharia de Features)
 
 Aqui, criamos características que podem ajudar o modelo a identificar fraudes.
+
+# fraud_detection_project/feature_engineering.py
+import pandas as pd
+import numpy as np
+
+def create_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cria features a partir dos dados brutos de transações.
+
+    Args:
+        df (pd.DataFrame): DataFrame contendo os dados brutos de transações.
+
+    Returns:
+        pd.DataFrame: DataFrame com as features adicionadas.
+    """
+    print(" Realizando engenharia de features...")
+
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    # Feature 1: Hora do dia e Dia da semana
+    df['hour_of_day'] = df['timestamp'].dt.hour
+    df['day_of_week'] = df['timestamp'].dt.dayofweek
+    df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
+
+    # Feature 2: Transações por usuário nas últimas X horas/dias (Ex: 24h)
+    df = df.sort_values(by=['user_id', 'timestamp'])
+    df['transaction_count_24h'] = df.groupby('user_id')['timestamp'].rolling('24H').count().reset_index(level=0, drop=True) - 1 # Exclui a transação atual
+    df['transaction_count_24h'] = df['transaction_count_24h'].fillna(0)
+    
+    # Feature 3: Média e Desvio Padrão do valor das transações por usuário (últimas X transações ou histórico)
+    df['avg_amount_user_history'] = df.groupby('user_id')['amount'].expanding().mean().reset_index(level=0, drop=True)
+    df['std_amount_user_history'] = df.groupby('user_id')['amount'].expanding().std().reset_index(level=0, drop=True)
+    df['std_amount_user_history'] = df['std_amount_user_history'].fillna(0) # Para as primeiras transações
+
+    # Feature 4: Valor relativo à média do usuário
+    df['amount_vs_avg_user'] = df['amount'] / (df['avg_amount_user_history'] + 1e-6) # Adiciona epsilon para evitar divisão por zero
+
+    # Feature 5: One-hot encoding para features categóricas
+    df = pd.get_dummies(df, columns=['card_type', 'country', 'merchant_id'], drop_first=True)
+
+    # Removendo colunas que não serão usadas diretamente pelo modelo
+    df = df.drop(columns=['transaction_id', 'timestamp'], errors='ignore')
+
+    print(" Engenharia de features concluída.")
+    return df
+
+if __name__ == "__main__":
+    from data_generator import generate_synthetic_data
+    raw_df = generate_synthetic_data(num_transactions=1000)
+    features_df = create_features(raw_df)
+    print("\nPrimeiras 5 linhas do DataFrame com features:")
+    print(features_df.head())
+    print(f"\nColunas após engenharia de features: {features_df.columns.tolist()}")
+
+    # Salvando localmente para o exemplo
+    features_df.to_csv("synthetic_transactions_features.csv", index=False)
+    print("\nDados com features salvos localmente como 'synthetic_transactions_features.csv'.")
